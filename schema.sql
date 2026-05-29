@@ -95,4 +95,23 @@ create policy "own receipts insert" on storage.objects
 create policy "own receipts delete" on storage.objects
   for delete using (bucket_id = 'receipts' and (storage.foldername(name))[1] = auth.uid()::text);
 
+-- 6. PAYMENT METHODS (added later) — managed list, mirrors categories -----
+--    Safe to run on an existing project; it only adds new objects.
+create table public.payment_methods (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  name        text not null,
+  position    integer not null default 0,          -- drives the cohesive auto-color
+  created_at  timestamptz not null default now()
+);
+create index payment_methods_user_idx on public.payment_methods(user_id);
+
+alter table public.payment_methods enable row level security;
+create policy "own payment_methods" on public.payment_methods
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Link expenses to a payment method (nullable; null = "Unspecified").
+alter table public.expenses
+  add column payment_method_id uuid references public.payment_methods(id) on delete set null;
+
 -- Done. You should see "Success. No rows returned."

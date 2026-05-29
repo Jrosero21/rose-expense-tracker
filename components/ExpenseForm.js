@@ -7,13 +7,16 @@ const isPdfPath = (p) => /\.pdf$/i.test(p);
 import Icon from "@/components/Icon";
 
 export default function ExpenseForm({
-  categories, initial, onSave, onCancel, onDelete, today, getSignedUrl,
+  categories, paymentMethods = [], initial, onSave, onCancel, onDelete, today, getSignedUrl,
 }) {
   const editMode = !!onDelete;
   const [amount, setAmount] = useState(
     initial?.amount != null ? String(initial.amount) : ""
   );
   const [categoryId, setCategoryId] = useState(initial?.categoryId || "");
+  const [paymentMethodId, setPaymentMethodId] = useState(
+    initial?.paymentMethodId || ""
+  );
   const [description, setDescription] = useState(initial?.description || "");
   const [date, setDate] = useState(initial?.date || today);
   const [recurring, setRecurring] = useState(initial?.recurring || false);
@@ -57,6 +60,7 @@ export default function ExpenseForm({
       await onSave({
         amount: Number(amount),
         categoryId,
+        paymentMethodId,
         description: description.trim(),
         date,
         recurring,
@@ -131,6 +135,30 @@ export default function ExpenseForm({
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="field">
+        <div className="field-label">Paid with</div>
+        {paymentMethods.length > 0 ? (
+          <div className="select-wrap">
+            <select
+              className="input select-input"
+              value={paymentMethodId}
+              onChange={(e) => setPaymentMethodId(e.target.value)}
+            >
+              <option value="">— None —</option>
+              {paymentMethods.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <div className="field-hint">
+            Add accounts in the Payment methods tab to track them here.
+          </div>
+        )}
       </div>
 
       <div className="field">

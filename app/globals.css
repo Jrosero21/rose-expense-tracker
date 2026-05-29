@@ -52,6 +52,22 @@ body {
 .side-signout{justify-content:flex-start; width:100%;}
 .empty-state{padding:26px 4px; text-align:center; color:var(--soft); font-size:13.5px;}
 .form-error{font-size:13px; color:#D2503F; background:rgba(210,80,63,.10); padding:10px 12px; border-radius:10px;}
+.field-hint{font-size:12.5px; color:var(--soft); background:rgba(128,128,128,.08); padding:10px 12px; border-radius:11px;}
+.select-wrap{position:relative;}
+.select-wrap::after{content:"▾"; position:absolute; right:14px; top:50%; transform:translateY(-50%); color:var(--soft); pointer-events:none; font-size:12px;}
+.select-input{appearance:none; -webkit-appearance:none; padding-right:34px; cursor:pointer;}
+
+.pm-bars{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:13px;}
+.pm-bar{display:grid; grid-template-columns:minmax(110px,1.3fr) 2fr auto 34px; align-items:center; gap:12px;}
+.pm-name{display:flex; align-items:center; gap:8px; font-size:13.5px; font-weight:500; color:var(--ink); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.pm-track{height:8px; border-radius:6px; background:rgba(128,128,128,.14); overflow:hidden;}
+.pm-fill{display:block; height:100%; border-radius:6px; transition:width .3s ease;}
+.pm-amt{font-family:'JetBrains Mono',monospace; font-weight:600; font-size:13px; letter-spacing:-.02em;}
+.pm-pct{font-size:11.5px; color:var(--faint); width:34px; text-align:right;}
+@media(max-width:760px){
+  .pm-bar{grid-template-columns:1fr 1.3fr auto;}
+  .pm-pct{display:none;}
+}
 .side-foot-label{font-size:11px; text-transform:uppercase; letter-spacing:.09em; color:var(--faint); font-weight:600;}
 .side-foot-amt{font-family:'JetBrains Mono',monospace; font-size:24px; font-weight:700; margin-top:6px; letter-spacing:-.02em;}
 .side-foot-sub{font-size:12.5px; color:var(--soft); margin-top:2px;}
@@ -123,6 +139,15 @@ body {
 .tag{display:inline-flex; align-items:center; gap:3px; font-size:10.5px; font-weight:600; padding:2px 7px; border-radius:20px;}
 .tag-rec{background:rgba(128,128,128,.16); color:var(--soft);}
 .tag-rcpt{background:var(--accent-soft); color:var(--accent-text);}
+
+.seg{display:inline-flex; gap:2px; background:rgba(128,128,128,.10); border-radius:10px; padding:3px;}
+.seg-btn{border:none; background:none; color:var(--soft); font-family:inherit; font-size:12px; font-weight:600; padding:5px 11px; border-radius:8px; cursor:pointer; transition:.14s;}
+.seg-btn:hover{color:var(--ink);}
+.seg-btn.sel{background:var(--surface); color:var(--ink); box-shadow:0 1px 3px rgba(0,0,0,.10);}
+.tx-range-row{margin:-6px 0 14px;}
+.tx-group + .tx-group{margin-top:4px;}
+.tx-group-head{display:flex; justify-content:space-between; align-items:center; padding:12px 8px 7px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--faint); border-bottom:1px solid var(--line);}
+.tx-group-head span:last-child{font-family:'JetBrains Mono',monospace; letter-spacing:-.02em;}
 
 .tip{background:var(--tip-bg); color:var(--tip-text); padding:8px 11px; border-radius:9px; box-shadow:0 6px 18px rgba(0,0,0,.22);}
 .tip-lab{font-size:11.5px; opacity:.7; display:flex; align-items:center; gap:6px;}
@@ -238,12 +263,13 @@ body {
 @media(max-width:760px){
   .et-app{grid-template-columns:1fr;}
   .sidebar{display:none;}
+  .card-head{flex-wrap:wrap; gap:8px;}
   .page{padding:22px 18px 90px;}
   .grid,.cat-grid{grid-template-columns:1fr;}
   .title{font-size:27px;}
   .hero-amount{font-size:38px;}
   .donut-wrap{flex-direction:column;}
   .tabbar{display:flex; position:fixed; bottom:0; left:0; right:0; background:var(--surface); border-top:1px solid var(--line); padding:8px 8px calc(8px + env(safe-area-inset-bottom)); justify-content:space-around; z-index:20;}
-  .tab{display:flex; flex-direction:column; align-items:center; gap:3px; border:none; background:none; color:var(--soft); font-size:11px; font-weight:600; padding:6px 14px; border-radius:10px; cursor:pointer;}
+  .tab{display:flex; flex-direction:column; align-items:center; gap:3px; border:none; background:none; color:var(--soft); font-size:11px; font-weight:600; padding:6px 10px; border-radius:10px; cursor:pointer;}
   .tab.active{color:var(--accent);}
 }

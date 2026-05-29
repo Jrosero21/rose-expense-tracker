@@ -10,12 +10,52 @@ import {
 import Icon from "@/components/Icon";
 import { money, money0, fmtDate, monthLabel } from "@/lib/format";
 
+const TX_RANGES = [
+  ["month", "Month"],
+  ["3m", "3M"],
+  ["6m", "6M"],
+  ["12m", "12M"],
+];
+
 export default function Dashboard({
   theme, month, goPrev, goNext, canPrev, canNext, monthTotal, recurringTotal,
-  delta, byCategory, series, monthExpenses, catMap, onAddClick, onEdit,
+  delta, byCategory, byPaymentMethod, series, monthExpenses, catMap, pmMap,
+  txGroups, txTotal, txCount, txRange, txRangeLabel, onTxRange,
+  onAddClick, onEdit,
 }) {
   const up = delta != null && delta > 0;
   const label = monthLabel(month);
+  const pmMax = byPaymentMethod[0]?.value || 1;
+  const showTxHeads = txGroups.length > 1;
+
+  const renderTx = (e) => {
+    const c = catMap[e.categoryId ?? "uncat"] || catMap.uncat;
+    const pm = e.paymentMethodId ? pmMap[e.paymentMethodId] || null : null;
+    return (
+      <li key={e.id} className="tx" onClick={() => onEdit(e)}>
+        <span className="tx-ic" style={{ background: c.soft, color: c.color }}>
+          <Icon name={c.icon} size={17} />
+        </span>
+        <div className="tx-mid">
+          <div className="tx-desc">
+            {e.description}
+            {e.recurring && (
+              <span className="tag tag-rec"><Repeat size={11} /> Recurring</span>
+            )}
+            {e.receiptPath && (
+              <span className="tag tag-rcpt"><Receipt size={11} /> Receipt</span>
+            )}
+          </div>
+          <div className="tx-meta">
+            {c.name} · {fmtDate(e.date)}
+            {pm ? ` · ${pm.name}` : ""}
+          </div>
+        </div>
+        <span className="tx-amt">{money(e.amount)}</span>
+        <span className="tx-edit"><Pencil size={14} /></span>
+      </li>
+    );
+  };
 
   return (
     <div className="page">
@@ -108,6 +148,42 @@ export default function Dashboard({
 
         <section className="card span-2 reveal" style={{ animationDelay: "140ms" }}>
           <div className="card-head">
+            <h2 className="card-title">By payment method</h2>
+            <span className="muted">{label}</span>
+          </div>
+          {byPaymentMethod.length > 0 ? (
+            <ul className="pm-bars">
+              {byPaymentMethod.map((p) => (
+                <li key={p.id} className="pm-bar">
+                  <span className="pm-name">
+                    <span className="dot" style={{ background: p.color }} />
+                    {p.name}
+                  </span>
+                  <span className="pm-track">
+                    <span
+                      className="pm-fill"
+                      style={{
+                        width: (p.value / pmMax) * 100 + "%",
+                        background: p.color,
+                      }}
+                    />
+                  </span>
+                  <span className="pm-amt">{money0(p.value)}</span>
+                  <span className="pm-pct">
+                    {Math.round((p.value / monthTotal) * 100)}%
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="empty-state">
+              No payment methods recorded this month.
+            </div>
+          )}
+        </section>
+
+        <section className="card span-2 reveal" style={{ animationDelay: "210ms" }}>
+          <div className="card-head">
             <h2 className="card-title">Month over month</h2>
             <div className="chart-legend">
               <span><i className="cl-dot cl-rec" /> Recurring</span>
@@ -126,42 +202,39 @@ export default function Dashboard({
           </div>
         </section>
 
-        <section className="card span-2 reveal" style={{ animationDelay: "210ms" }}>
+        <section className="card span-2 reveal" style={{ animationDelay: "280ms" }}>
           <div className="card-head">
             <h2 className="card-title">Transactions</h2>
-            <span className="muted">{label}</span>
-          </div>
-          {monthExpenses.length > 0 ? (
-            <ul className="tx-list">
-              {monthExpenses.map((e) => {
-                const c = catMap[e.categoryId ?? "uncat"] || catMap.uncat;
-                return (
-                  <li key={e.id} className="tx" onClick={() => onEdit(e)}>
-                    <span className="tx-ic" style={{ background: c.soft, color: c.color }}>
-                      <Icon name={c.icon} size={17} />
-                    </span>
-                    <div className="tx-mid">
-                      <div className="tx-desc">
-                        {e.description}
-                        {e.recurring && (
-                          <span className="tag tag-rec"><Repeat size={11} /> Recurring</span>
-                        )}
-                        {e.receiptPath && (
-                          <span className="tag tag-rcpt"><Receipt size={11} /> Receipt</span>
-                        )}
-                      </div>
-                      <div className="tx-meta">{c.name} · {fmtDate(e.date)}</div>
-                    </div>
-                    <span className="tx-amt">{money(e.amount)}</span>
-                    <span className="tx-edit"><Pencil size={14} /></span>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <div className="empty-state">
-              No expenses recorded for {label}.
+            <div className="seg">
+              {TX_RANGES.map(([val, lbl]) => (
+                <button
+                  key={val}
+                  className={"seg-btn" + (txRange === val ? " sel" : "")}
+                  onClick={() => onTxRange(val)}
+                >
+                  {lbl}
+                </button>
+              ))}
             </div>
+          </div>
+          <div className="tx-range-row muted">
+            {txRangeLabel} · {txCount}{" "}
+            {txCount === 1 ? "transaction" : "transactions"} · {money0(txTotal)}
+          </div>
+          {txGroups.length > 0 ? (
+            txGroups.map((g) => (
+              <div key={g.month} className="tx-group">
+                {showTxHeads && (
+                  <div className="tx-group-head">
+                    <span>{g.label}</span>
+                    <span>{money0(g.total)}</span>
+                  </div>
+                )}
+                <ul className="tx-list">{g.items.map(renderTx)}</ul>
+              </div>
+            ))
+          ) : (
+            <div className="empty-state">No expenses in {txRangeLabel}.</div>
           )}
         </section>
       </div>

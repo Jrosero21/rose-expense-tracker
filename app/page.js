@@ -12,22 +12,28 @@ export default async function Home() {
 
   if (!user) redirect("/login");
 
-  const [{ data: categories }, { data: rawExpenses }] = await Promise.all([
-    supabase
-      .from("categories")
-      .select("id, name, icon, position")
-      .order("position", { ascending: true }),
-    supabase
-      .from("expenses")
-      .select(
-        "id, category_id, amount, description, expense_date, is_recurring, receipt_path"
-      )
-      .order("expense_date", { ascending: false }),
-  ]);
+  const [{ data: categories }, { data: paymentMethods }, { data: rawExpenses }] =
+    await Promise.all([
+      supabase
+        .from("categories")
+        .select("id, name, icon, position")
+        .order("position", { ascending: true }),
+      supabase
+        .from("payment_methods")
+        .select("id, name, position")
+        .order("position", { ascending: true }),
+      supabase
+        .from("expenses")
+        .select(
+          "id, category_id, payment_method_id, amount, description, expense_date, is_recurring, receipt_path"
+        )
+        .order("expense_date", { ascending: false }),
+    ]);
 
   const expenses = (rawExpenses ?? []).map((e) => ({
     id: e.id,
     categoryId: e.category_id,
+    paymentMethodId: e.payment_method_id,
     amount: Number(e.amount),
     description: e.description,
     date: e.expense_date,
@@ -44,6 +50,7 @@ export default async function Home() {
   return (
     <AppShell
       categories={categories ?? []}
+      paymentMethods={paymentMethods ?? []}
       expenses={expenses}
       userId={user.id}
       serverMonth={serverMonth}

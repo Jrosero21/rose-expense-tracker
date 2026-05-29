@@ -1,14 +1,16 @@
 "use client";
 
 import { useState, useMemo, useSyncExternalStore } from "react";
-import { LayoutGrid, Plus, Tags, Wallet, X } from "lucide-react";
+import { LayoutGrid, Plus, Tags, CreditCard, Wallet, X } from "lucide-react";
 import SignOutButton from "@/components/SignOutButton";
 import Dashboard from "@/components/Dashboard";
 import ExpenseForm from "@/components/ExpenseForm";
 import Categories from "@/components/Categories";
+import PaymentMethods from "@/components/PaymentMethods";
 import { createClient } from "@/lib/supabase/client";
 import {
-  THEMES, THEME_LIST, DEFAULT_THEME, cssVars, catColor, catSoft, UNCAT_COLOR, UNCAT_SOFT,
+  THEMES, THEME_LIST, DEFAULT_THEME, cssVars, catColor, catSoft,
+  pmColor, pmSoft, UNCAT_COLOR, UNCAT_SOFT,
 } from "@/lib/theme";
 import { addMonth, monthsEndingAt, monthShort, monthLabel, money0 } from "@/lib/format";
 
@@ -16,9 +18,12 @@ const NAV = [
   { id: "dashboard", label: "Dashboard", icon: LayoutGrid },
   { id: "add", label: "Add expense", icon: Plus },
   { id: "categories", label: "Categories", icon: Tags },
+  { id: "payments", label: "Payment methods", icon: CreditCard },
 ];
 
 const RECEIPTS_BUCKET = "receipts";
+
+const RANGE_MONTHS = { "3m": 3, "6m": 6, "12m": 12 };
 
 const monthsOf = (expenses) =>
   [...new Set(expenses.map((e) => e.date.slice(0, 7)))].sort();
@@ -26,6 +31,7 @@ const monthsOf = (expenses) =>
 const normalizeExpense = (row) => ({
   id: row.id,
   categoryId: row.category_id,
+  paymentMethodId: row.payment_method_id,
   amount: Number(row.amount),
   description: row.description,
   date: row.expense_date,
@@ -34,7 +40,7 @@ const normalizeExpense = (row) => ({
 });
 
 const EXPENSE_COLS =
-  "id, category_id, amount, description, expense_date, is_recurring, receipt_path";
+  "id, category_id, payment_method_id, amount, description, expense_date, is_recurring, receipt_path";
 
 const safeName = (name) => name.replace(/[^a-zA-Z0-9._-]/g, "_");
 
@@ -65,7 +71,7 @@ const themeStore = {
   },
 };
 
-export default function AppShell({ categories: initialCategories, expenses: initialExpenses, userId, serverMonth, today }) {
+export default function AppShell({ categories: initialCategories, paymentMethods: initialPaymentMethods, expenses: initialExpenses, userId, serverMonth, today }) {
   const supabase = useMemo(() => createClient(), []);
   const themeKey = useSyncExternalStore(
     themeStore.subscribe,
@@ -74,8 +80,10 @@ export default function AppShell({ categories: initialCategories, expenses: init
   );
   const [view, setView] = useState("dashboard");
   const [categories, setCategories] = useState(initialCategories);
+  const [paymentMethods, setPaymentMethods] = useState(initialPaymentMethods);
   const [expenses, setExpenses] = useState(initialExpenses);
   const [editing, setEditing] = useState(null);
+  const [txRange, setTxRange] = useState("month");
   const [month, setMonth] = useState(() => {
     const ms = monthsOf(initialExpenses);
     return ms.length ? ms[ms.length - 1] : serverMonth;
@@ -104,6 +112,27 @@ export default function AppShell({ categories: initialCategories, expenses: init
     };
     return map;
   }, [cats, T]);
+
+  const pms = useMemo(
+    () =>
+      paymentMethods.map((p) => ({
+        ...p,
+        color: pmColor(T, p.position),
+        soft: pmSoft(T, p.position),
+      })),
+    [paymentMethods, T]
+  );
+
+  const pmMap = useMemo(() => {
+    const map = Object.fromEntries(pms.map((p) => [p.id, p]));
+    map.unspecified = {
+      id: "unspecified",
+      name: "Unspecified",
+      color: UNCAT_COLOR(T),
+      soft: UNCAT_SOFT,
+    };
+    return map;
+  }, [pms, T]);
 
   const { minMonth, maxMonth } = useMemo(() => {
     const ms = monthsOf(expenses);
@@ -152,6 +181,51 @@ export default function AppShell({ categories: initialCategories, expenses: init
       .filter((c) => c.value > 0)
       .sort((a, b) => b.value - a.value);
   }, [monthExpenses, catMap]);
+
+  const byPaymentMethod = useMemo(() => {
+    const sums = {};
+    monthExpenses.forEach((e) => {
+      const key = e.paymentMethodId ?? "unspecified";
+      sums[key] = (sums[key] || 0) + e.amount;
+    });
+    return Object.entries(sums)
+      .map(([id, value]) => {
+        const p = pmMap[id] || pmMap.unspecified;
+        return { id: p.id, name: p.name, color: p.color, soft: p.soft, value };
+      })
+      .filter((p) => p.value > 0)
+      .sort((a, b) => b.value - a.value);
+  }, [monthExpenses, pmMap]);
+
+  // Transactions list honors a selectable window (single month or last N months),
+  // ending at the selected month, grouped by month with subtotals.
+  const tx = useMemo(() => {
+    const end = month;
+    const n = RANGE_MONTHS[txRange] || 1;
+    const start = addMonth(month, -(n - 1));
+    const items = expenses
+      .filter((e) => {
+        const m = e.date.slice(0, 7);
+        return m >= start && m <= end;
+      })
+      .sort((a, b) => b.date.localeCompare(a.date));
+    const groupsMap = new Map();
+    let total = 0;
+    items.forEach((e) => {
+      const m = e.date.slice(0, 7);
+      if (!groupsMap.has(m)) {
+        groupsMap.set(m, { month: m, label: monthLabel(m), total: 0, items: [] });
+      }
+      const g = groupsMap.get(m);
+      g.total += e.amount;
+      g.items.push(e);
+      total += e.amount;
+    });
+    const fmtMY = (m) => `${monthShort(m)} ${m.slice(0, 4)}`;
+    const label =
+      txRange === "month" ? monthLabel(month) : `${fmtMY(start)} – ${fmtMY(end)}`;
+    return { groups: [...groupsMap.values()], total, count: items.length, label };
+  }, [expenses, month, txRange]);
 
   // The month-over-month window always ends at the current month (or later,
   // if future-dated expenses exist) — independent of the selected month — so
@@ -228,6 +302,7 @@ export default function AppShell({ categories: initialCategories, expenses: init
       .insert({
         user_id: userId,
         category_id: vals.categoryId,
+        payment_method_id: vals.paymentMethodId || null,
         amount: vals.amount,
         description: vals.description,
         expense_date: vals.date,
@@ -251,6 +326,7 @@ export default function AppShell({ categories: initialCategories, expenses: init
       .from("expenses")
       .update({
         category_id: vals.categoryId,
+        payment_method_id: vals.paymentMethodId || null,
         amount: vals.amount,
         description: vals.description,
         expense_date: vals.date,
@@ -302,6 +378,31 @@ export default function AppShell({ categories: initialCategories, expenses: init
     // mirror that locally so they render as Uncategorized without a refetch.
     setExpenses((prev) =>
       prev.map((e) => (e.categoryId === id ? { ...e, categoryId: null } : e))
+    );
+  };
+
+  const addPaymentMethod = async (name) => {
+    const position = paymentMethods.length
+      ? Math.max(...paymentMethods.map((p) => p.position)) + 1
+      : 0;
+    const { data, error } = await supabase
+      .from("payment_methods")
+      .insert({ user_id: userId, name, position })
+      .select("id, name, position")
+      .single();
+    if (error) throw error;
+    setPaymentMethods((prev) => [...prev, data]);
+  };
+
+  const deletePaymentMethod = async (id) => {
+    const { error } = await supabase.from("payment_methods").delete().eq("id", id);
+    if (error) throw error;
+    setPaymentMethods((prev) => prev.filter((p) => p.id !== id));
+    // DB nulls payment_method_id on affected expenses; mirror locally.
+    setExpenses((prev) =>
+      prev.map((e) =>
+        e.paymentMethodId === id ? { ...e, paymentMethodId: null } : e
+      )
     );
   };
 
@@ -364,9 +465,17 @@ export default function AppShell({ categories: initialCategories, expenses: init
             recurringTotal={recurringTotal}
             delta={delta}
             byCategory={byCategory}
+            byPaymentMethod={byPaymentMethod}
             series={series}
             monthExpenses={monthExpenses}
             catMap={catMap}
+            pmMap={pmMap}
+            txGroups={tx.groups}
+            txTotal={tx.total}
+            txCount={tx.count}
+            txRange={txRange}
+            txRangeLabel={tx.label}
+            onTxRange={setTxRange}
             onAddClick={() => setView("add")}
             onEdit={setEditing}
           />
@@ -385,6 +494,7 @@ export default function AppShell({ categories: initialCategories, expenses: init
             <div className="card reveal">
               <ExpenseForm
                 categories={cats}
+                paymentMethods={pms}
                 today={today}
                 getSignedUrl={getSignedUrl}
                 onSave={addExpense}
@@ -400,6 +510,15 @@ export default function AppShell({ categories: initialCategories, expenses: init
             month={month}
             onAdd={addCategory}
             onDelete={deleteCategory}
+          />
+        )}
+        {view === "payments" && (
+          <PaymentMethods
+            paymentMethods={pms}
+            expenses={expenses}
+            month={month}
+            onAdd={addPaymentMethod}
+            onDelete={deletePaymentMethod}
           />
         )}
       </main>
@@ -419,6 +538,7 @@ export default function AppShell({ categories: initialCategories, expenses: init
             <ExpenseForm
               key={editing.id}
               categories={cats}
+              paymentMethods={pms}
               initial={editing}
               today={today}
               getSignedUrl={getSignedUrl}
